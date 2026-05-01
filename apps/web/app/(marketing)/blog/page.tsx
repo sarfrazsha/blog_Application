@@ -1,9 +1,11 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { Button } from '@kit/ui/button';
+import { cn } from '@kit/ui/utils';
 
 import { withI18n } from '~/lib/i18n/with-i18n';
-import { getPaginatedPosts } from '~/lib/server/blog/service';
+import { getPaginatedPosts, getPostsCount } from '~/lib/server/blog/service';
 
 const PAGE_SIZE = 5;
 
@@ -13,13 +15,27 @@ async function BlogPage(props: {
   const searchParams = (await props.searchParams) ?? {};
   const currentPage = parsePageParam(searchParams.page);
 
-  const { posts, hasNextPage } = await getPaginatedPosts({
-    page: currentPage,
-    pageSize: PAGE_SIZE,
-  });
+  const [{ posts, hasNextPage }, postsCount] = await Promise.all([
+    getPaginatedPosts({
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+    }),
+    getPostsCount(),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(postsCount / PAGE_SIZE));
+
+  if (currentPage > totalPages) {
+    redirect(buildBlogPageHref(totalPages));
+  }
 
   const hasPrevious = currentPage > 1;
   const hasNext = hasNextPage;
+
+  const { pages, showLeftEllipsis, showRightEllipsis } = buildPagination({
+    currentPage,
+    totalPages,
+  });
 
   return (
     <main className={'container mx-auto max-w-4xl px-4 py-12'}>
@@ -65,31 +81,63 @@ async function BlogPage(props: {
         </div>
       )}
 
-      <div className={'mt-10 flex items-center justify-between'}>
-        {hasPrevious ? (
-          <Link
-            href={buildBlogPageHref(currentPage - 1)}
-            className={'text-sm underline'}
+      {totalPages > 1 ? (
+        <nav
+          aria-label="Pagination"
+          className={'mt-10 flex flex-wrap items-center justify-center gap-2'}
+        >
+          <Button
+            asChild
+            variant={'outline'}
+            size={'sm'}
+            disabled={!hasPrevious}
           >
-            Previous
-          </Link>
-        ) : (
-          <span />
-        )}
+            <Link
+              aria-disabled={!hasPrevious}
+              tabIndex={hasPrevious ? 0 : -1}
+              className={cn(!hasPrevious && 'pointer-events-none opacity-50')}
+              href={buildBlogPageHref(currentPage - 1)}
+            >
+              Previous
+            </Link>
+          </Button>
 
-        <span className={'text-muted-foreground text-sm'}>Page {currentPage}</span>
+          <div className={'flex items-center gap-1'}>
+            <PageNumberLink page={1} activePage={currentPage} />
 
-        {hasNext ? (
-          <Link
-            href={buildBlogPageHref(currentPage + 1)}
-            className={'text-sm underline'}
-          >
-            Next
-          </Link>
-        ) : (
-          <span />
-        )}
-      </div>
+            {showLeftEllipsis ? (
+              <span className={'text-muted-foreground px-2 text-sm'}>…</span>
+            ) : null}
+
+            {pages.map((page) => (
+              <PageNumberLink key={page} page={page} activePage={currentPage} />
+            ))}
+
+            {showRightEllipsis ? (
+              <span className={'text-muted-foreground px-2 text-sm'}>…</span>
+            ) : null}
+
+            {totalPages > 1 ? (
+              <PageNumberLink page={totalPages} activePage={currentPage} />
+            ) : null}
+          </div>
+
+          <Button asChild variant={'outline'} size={'sm'} disabled={!hasNext}>
+            <Link
+              aria-disabled={!hasNext}
+              tabIndex={hasNext ? 0 : -1}
+              className={cn(!hasNext && 'pointer-events-none opacity-50')}
+              href={buildBlogPageHref(currentPage + 1)}
+            >
+              Next
+            </Link>
+          </Button>
+
+          <span className={'text-muted-foreground w-full pt-2 text-center text-sm'}>
+            Page {currentPage} of {totalPages}
+          </span>
+        </nav>
+      ) : null}
     </main>
   );
 }
@@ -112,6 +160,71 @@ function buildBlogPageHref(page: number) {
   }
 
   return `/blog?page=${page}`;
+}
+
+function PageNumberLink(props: { page: number; activePage: number }) {
+  const isActive = props.page === props.activePage;
+
+  return (
+    <Link
+      href={buildBlogPageHref(props.page)}
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
+        'inline-flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm',
+        isActive
+          ? 'bg-primary text-primary-foreground font-semibold'
+          : 'hover:bg-muted text-foreground',
+      )}
+    >
+      {props.page}
+    </Link>
+  );
+}
+
+function buildPagination(params: { currentPage: number; totalPages: number }) {
+  const { currentPage, totalPages } = params;
+
+  // Rules:
+  // - If there are <= 3 pages, show them all: 1 2 3
+  // - If there are more, the "early pages" view should be: 1 2 3 … last
+  // - Past page 3, keep a small window around the active page (like typical pagination)
+  if (totalPages <= 3) {
+    return {
+      pages: Array.from({ length: Math.max(0, totalPages - 2) }, (_, idx) => idx + 2),
+      showLeftEllipsis: false,
+      showRightEllipsis: false,
+    };
+  }
+
+  // Near the beginning: 1 2 3 … last
+  if (currentPage <= 3) {
+    return {
+      pages: [2, 3].filter((p) => p < totalPages),
+      showLeftEllipsis: false,
+      showRightEllipsis: totalPages > 4,
+    };
+  }
+
+  // Near the end: 1 … (last-2) (last-1) last
+  if (currentPage >= totalPages - 2) {
+    const start = Math.max(2, totalPages - 2);
+
+    return {
+      pages: Array.from({ length: totalPages - start }, (_, idx) => start + idx),
+      showLeftEllipsis: totalPages > 4,
+      showRightEllipsis: false,
+    };
+  }
+
+  // Middle window: 1 … (current-1) current (current+1) … last
+  const start = currentPage - 1;
+  const end = currentPage + 1;
+
+  return {
+    pages: Array.from({ length: end - start + 1 }, (_, idx) => start + idx),
+    showLeftEllipsis: true,
+    showRightEllipsis: true,
+  };
 }
 
 function formatDate(value: string) {
