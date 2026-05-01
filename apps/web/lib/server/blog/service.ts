@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { getSupabaseServerClient } from '@kit/supabase/server-client';
+
 import {
   CREATE_POST_MUTATION,
   CREATE_POST_MUTATION_SNAKE_CASE,
@@ -78,6 +80,20 @@ export async function getPaginatedPosts(params: {
     posts: hasNextPage ? posts.slice(0, params.pageSize) : posts,
     hasNextPage,
   };
+}
+
+export async function getPostsCount() {
+  const client = getSupabaseServerClient();
+
+  const { count, error } = await client
+    .from('blog_posts')
+    .select('id', { count: 'exact', head: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
 }
 
 export async function getPostById(id: string) {
