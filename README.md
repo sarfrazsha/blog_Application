@@ -332,6 +332,66 @@ Remember to enable Node.js compatibility in the Cloudflare dashboard.
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/9r-iFh?referralCode=RmCO-Z&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
+## Interview Assignment: Blog App
+
+This repository now includes a blog implementation for the take-home assignment using Next.js + Makerkit + Supabase + GraphQL.
+
+### Implemented Features
+- Public blog list page at `/blog` with pagination (`5` posts per page).
+- Public post details page at `/blog/[id]`.
+- Auth-protected create page at `/home/blog/new`.
+- Create post fields: `title`, `body`; author is derived from signed-in user context.
+- Supabase GraphQL queries/mutation for:
+  - fetching paginated posts,
+  - fetching one post by id,
+  - creating a post.
+
+### Setup Instructions (Assignment Focus)
+1. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+2. Configure environment variables in `apps/web/.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (required by existing Makerkit features)
+3. Apply migrations to your linked Supabase project:
+   ```bash
+   pnpm --filter web supabase db push
+   ```
+4. Start the app:
+   ```bash
+   pnpm --filter web dev
+   ```
+5. Open:
+   - `http://localhost:3000/blog`
+   - `http://localhost:3000/home/blog/new` (after login)
+
+### Linking to Supabase Project
+If not already linked:
+```bash
+pnpm --filter web supabase link --project-ref <your-project-ref>
+pnpm --filter web supabase db push
+```
+
+### Authentication Configuration
+- Email/password is controlled by `NEXT_PUBLIC_AUTH_PASSWORD=true`.
+- Google OAuth is enabled in `apps/web/config/auth.config.ts` (`oAuth: ['google']`).
+- Ensure Google provider is enabled in Supabase Auth settings and callback URL points to:
+  - `<your-site-url>/auth/callback`
+
+### Blog Data and GraphQL
+- Migration file:
+  - `apps/web/supabase/migrations/20260501073000_blog_posts.sql`
+- GraphQL service layer:
+  - `apps/web/lib/server/blog/graphql-client.ts`
+  - `apps/web/lib/server/blog/queries.ts`
+  - `apps/web/lib/server/blog/service.ts`
+
+### Notes on Bonus Features
+- This submission intentionally focuses on **core requirements only**.
+- Bonus items (ISR, OTP login, optimistic UI, profile dropdown enhancements) are not included in this scope.
+
 ## Contributing
 
 Contributions for bug fixed are welcome! However, please open an issue first to discuss your ideas before making a pull request.
