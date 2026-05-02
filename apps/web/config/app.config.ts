@@ -46,6 +46,12 @@ const AppConfigSchema = z
         return true;
       }
 
+      // Allow localhost http during local builds even with NODE_ENV=production.
+      // Production deployments should use HTTPS.
+      if (schema.url.startsWith('http://localhost')) {
+        return true;
+      }
+
       return !schema.url.startsWith('http:');
     },
     {
