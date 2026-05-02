@@ -83,7 +83,9 @@ export async function getPaginatedPosts(params: {
 }
 
 export async function getPostsCount() {
-  const client = getSupabaseServerClient();
+  // The generated Database types in this starter may not include the custom
+  // `blog_posts` table. Use a loose schema here to keep typecheck/build green.
+  const client = getSupabaseServerClient<any>();
 
   const { count, error } = await client
     .from('blog_posts')
