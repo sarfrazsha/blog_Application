@@ -3,7 +3,7 @@
 A modern blog application built with **Next.js (App Router)**, **Supabase**, and a customized starter-kit foundation.
 
 ## Live Demo
-- Add your deployed URL here (example): `https://your-app.example.com`
+ still we have not deployed this project.
 
 ---
 
